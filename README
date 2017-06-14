@@ -1,4 +1,4 @@
-MSP430 Launchpad study of an interrupt driven embedded system
+MSP430 Launchpad controlling an MCP23S17 with heavy use of interrupts
 
 Connects to an MCP23S17 and relays the state of DIP switches on its port B to LEDs on its port A. The CPU is turned off at any opportunity to save power. Interrupts are used to transmit and receive data and be notified when new data is available.
 
