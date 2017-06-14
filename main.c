@@ -1,18 +1,8 @@
 #include <msp430.h>
+
 #include "main.h"
 #include "libspibuf.h"
 #include "mcp23s17.h"
-
-/*
-	Connects to an MCP23S17 and relays the state of DIP switches on its port B to
-	LEDs on its port A. The CPU is turned off at any opportunity and interrupts
-	are used to transmit and receive data and be notified when new data is
-	available.
-
-	SPI bus A is used via pins 3, 4, and 6 (P1.{1,2,4})
-	One interrupt from slave used on pin 5 (P1.3)
-	The Launchpad's green LED is used on pin 14 (P1.6)
-*/
 
 struct spibuf mybuf;
 
@@ -22,7 +12,6 @@ int main(void) {
 	port_setup();
 	spi_setup();
 
-	// Set up the data structure for libspibuf
 	spibuf_init(&mybuf, &P1OUT, BIT5, &UCA0TXBUF, &UCA0RXBUF);
 	spibuf_reset(&mybuf); // Not exactly a 100% reset, see implementation
 
@@ -103,27 +92,29 @@ int main(void) {
 		port1_int_enable();
 		_BIS_SR(CPUOFF + SCG0 + SCG1 + GIE);
 		_BIC_SR(GIE);
-	goto loop_forever; // One of the few cases where "goto" is really appropriate
+	goto loop_forever; // One of the few cases where "goto" is appropriate
 
 	return 0;
 }
 
 void port_setup(void) {
-	P1OUT = BIT3 | BIT5; // P1.{3,5} are logical 1 now
-	P1DIR = BIT0 | BIT5 | BIT6; // P1.{0,5,6} are GPIO outputs
-	P1SEL = BIT1 | BIT2 | BIT4; // Between these two lines...
-	P1SEL2 = BIT1 | BIT2 | BIT4; // ... P1.{1,2,4} are now connected to the UCA0 serial bus
-	P1IES = BIT3; // Interrupts on P1.3 happen on high-low transition
+	P1REN = BIT7;
+	P2REN = 0xFF;
+	P3REN = 0xFF;
+	P1OUT = BIT5;
+	P1DIR = BIT0 | BIT5 | BIT6;
+	P1SEL = BIT1 | BIT2 | BIT4;
+	P1SEL2 = BIT1 | BIT2 | BIT4;
+	P1IES = BIT3;
 }
 
 void spi_setup(void) {
-	UCA0CTL1 = UCSWRST; // Reset serial module
-	UCA0CTL0 |= UCCKPH + UCMSB + UCMST + UCSYNC; // Most Significant Bit, Master, Synchronous, Mode(0,0)
-	UCA0CTL1 |= UCSSEL_2; // Clock source is the Sub-Main Clock (For peripherals)
-	UCA0BR0 |= 0x02; // Divide clock by 4 to get effective SPI bus speed
-	UCA0BR1 = 0; // High byte of clock division, not used
-	UCA0MCTL = 0; // No modulation, unknown beyond that
-	UCA0CTL1 &= ~(UCSWRST); // Start serial module
+	UCA0CTL1 = UCSWRST; // Stop module
+	UCA0CTL0 = UCCKPH + UCMSB + UCMST + UCSYNC;
+	UCA0CTL1 |= UCSSEL_2;
+	UCA0BR0 = 0x04;  
+	UCA0BR1 = 0;
+	UCA0CTL1 &= ~(UCSWRST); // Start module
 }
 
 void spi_int_enable(void) {
@@ -142,16 +133,14 @@ void port1_int_disable(void) {
 	P1IE &= ~BIT3;
 }
 
-__attribute__((interrupt(PORT1_VECTOR)))
 void port1_isr(void) {
-	P1IFG = 0; // Clear the interrupt
+	P1IFG = 0;
 	port1_int_disable();
 	__low_power_mode_off_on_exit();
 }
 
-__attribute__((interrupt(USCIAB0RX_VECTOR)))
 void spi_rx_isr(void) {
-	IFG2 &= ~UCA0RXIFG; // Clear the interrupt
+	IFG2 &= ~UCA0RXIFG;
 	if(spibuf_rx(&mybuf)) {
 		P1OUT &= ~BIT6;
 		spi_int_disable();
@@ -159,9 +148,8 @@ void spi_rx_isr(void) {
 	}
 }
 
-__attribute__((interrupt(USCIAB0TX_VECTOR)))
 void spi_tx_isr(void) {
-	IFG2 &= ~UCA0TXIFG; // Clear the interrupt
+	IFG2 &= ~UCA0TXIFG;
 	if(spibuf_tx(&mybuf)) {
 		P1OUT |= BIT6;
 	}
