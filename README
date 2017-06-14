@@ -1,0 +1,7 @@
+MSP430 Launchpad study of an interrupt driven embedded system
+
+Connects to an MCP23S17 and relays the state of DIP switches on its port B to LEDs on its port A. The CPU is turned off at any opportunity to save power. Interrupts are used to transmit and receive data and be notified when new data is available.
+
+SPI bus A is used via pins 3, 4, and 6 (P1.{1,2,4})
+One interrupt from slave used on pin 5 (P1.3)
+The Launchpad's green LED is used on pin 14 (P1.6)
